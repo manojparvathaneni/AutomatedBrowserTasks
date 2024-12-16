@@ -122,4 +122,4 @@ This project provides scripts to manage browser sessions by launching browser wi
 
 ---
 
-This setup automates browser session management efficiently. For further questions or issues, feel free to contact [Your Contact Info].
+This setup automates browser session management efficiently.
