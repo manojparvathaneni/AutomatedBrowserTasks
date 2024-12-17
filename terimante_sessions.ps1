@@ -1,49 +1,44 @@
-# File containing the PIDs
-$sessionsFile = "sessions.txt"
-
 # Import JSON configuration
 $config = Get-Content -Raw -Path "config.json" | ConvertFrom-Json
-$browserName = $config.browser
+$browser = $config.browser
+$logFile = "terminate_log.txt"
 
-# Map browser names to process names (adjust as needed for different browsers)
+# Map browser names to process names
 $processNames = @{
     "chrome" = "chrome"
-    "firefox" = "firefox"
-    "edge" = "msedge"
+    "msedge"   = "msedge"
+    "firefox"= "firefox"
 }
 
-if (-not $processNames.ContainsKey($browserName)) {
-    Write-Host "Browser $browserName not supported for termination."
+if (-not $processNames.ContainsKey($browser)) {
+    Add-Content -Path $logFile -Value "[$(Get-Date)] Browser $browser is not supported."
     exit
 }
 
-$expectedProcessName = $processNames[$browserName]
+$expectedProcessName = $processNames[$browser]
 
-# Check if the sessions file exists
-if (!(Test-Path $sessionsFile)) {
-    Write-Host "No session file found. Exiting."
-    exit
-}
+# Log start
+Add-Content -Path $logFile -Value "[$(Get-Date)] Starting termination for browser: $browser."
 
-# Read PIDs from file and terminate matching processes
-$PIDs = Get-Content -Path $sessionsFile
-foreach ($PID in $PIDs) {
-    try {
-        # Get process information
-        $process = Get-Process -Id $PID -ErrorAction Stop
+try {
+    # Find all processes matching the browser name
+    $browserProcesses = Get-Process | Where-Object { $_.ProcessName -eq $expectedProcessName }
 
-        # Check if the process name matches the expected browser name
-        if ($process.ProcessName -eq $expectedProcessName) {
-            Stop-Process -Id $PID -Force -ErrorAction Stop
-            Write-Host "Terminated process with PID $PID and name $($process.ProcessName)."
-        } else {
-            Write-Host "PID $PID does not match expected browser name ($expectedProcessName). Skipping."
+    if ($browserProcesses) {
+        foreach ($browserProcess in $browserProcesses) {
+            try {
+                # Terminate the process
+                Stop-Process -Id $browserProcess.Id -Force -ErrorAction Stop
+                Add-Content -Path $logFile -Value "[$(Get-Date)] Terminated process: $($browserProcess.ProcessName) with PID: $($browserProcess.Id)."
+            } catch {
+                Add-Content -Path $logFile -Value "[$(Get-Date)] Failed to terminate PID: $($browserProcess.Id). Error: $_"
+            }
         }
-    } catch {
-        Write-Host "Failed to handle PID $PID. It may not exist or another error occurred."
+    } else {
+        Add-Content -Path $logFile -Value "[$(Get-Date)] No processes found for browser: $browser."
     }
+} catch {
+    Add-Content -Path $logFile -Value "[$(Get-Date)] An error occurred: $_"
 }
 
-# Cleanup
-Remove-Item $sessionsFile
-Write-Host "All matching sessions terminated and session file removed."
+Add-Content -Path $logFile -Value "[$(Get-Date)] Termination process completed."
