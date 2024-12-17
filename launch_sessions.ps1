@@ -5,16 +5,37 @@ $config = Get-Content -Raw -Path "config.json" | ConvertFrom-Json
 $url = $config.url
 $numWindows = $config.numWindows
 $browser = $config.browser
-$sessionsFile = "sessions.txt"
+$logFile = "launch_log.txt"
 
-# Clear previous session data
-if (Test-Path $sessionsFile) {
-    Remove-Item $sessionsFile
+# Log start
+Add-Content -Path $logFile -Value "[$(Get-Date)] Starting browser session launch for browser: $browser."
+
+# Map browser executable names
+$browserPaths = @{
+    "chrome" = "chrome"
+    "msedge"   = "msedge"
+    "firefox"= "firefox"
 }
 
-# Open browser windows and track PIDs
-for ($i = 1; $i -le $numWindows; $i++) {
-    $process = Start-Process -FilePath $browser -ArgumentList "--new-window $url" -PassThru
-    $process.Id | Out-File -Append -FilePath $sessionsFile
+if (-not $browserPaths.ContainsKey($browser)) {
+    Add-Content -Path $logFile -Value "[$(Get-Date)] Browser $browser is not supported."
+    exit
 }
-Write-Host "Launched $numWindows $browser windows with URL $url. PIDs saved to $sessionsFile."
+
+$browserExecutable = $browserPaths[$browser]
+
+try {
+    # Launch browser windows
+    for ($i = 1; $i -le $numWindows; $i++) {
+        try {
+            Start-Process -FilePath $browserExecutable -ArgumentList "--new-window $url"
+            Add-Content -Path $logFile -Value "[$(Get-Date)] Launched $browser window ($i of $numWindows)."
+        } catch {
+            Add-Content -Path $logFile -Value "[$(Get-Date)] Failed to launch $browser window ($i). Error: $_"
+        }
+    }
+    Add-Content -Path $logFile -Value "[$(Get-Date)] Completed browser session launch."
+} catch {
+    Add-Content -Path $logFile -Value "[$(Get-Date)] An unexpected error occurred: $_"
+}
+
